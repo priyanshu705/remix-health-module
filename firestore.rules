@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net: default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // User Profile Blueprint Validation
+    function isValidUserProfile(data) {
+      return data.id == request.auth.uid &&
+             data.email is string && data.email.size() <= 256 &&
+             data.createdAt is string && data.createdAt.size() <= 64 &&
+             data.updatedAt is string && data.updatedAt.size() <= 64 &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 128)) &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 512)) &&
+             (!('lastSpreadsheetId' in data) || (data.lastSpreadsheetId is string && data.lastSpreadsheetId.size() <= 128)) &&
+             (!('lastSpreadsheetTitle' in data) || (data.lastSpreadsheetTitle is string && data.lastSpreadsheetTitle.size() <= 256));
+    }
+
+    // Saved Spreadsheet Blueprint Validation
+    function isValidSavedSpreadsheet(data, userId) {
+      return data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.id is string && data.id.size() <= 128 &&
+             data.spreadsheetId is string && data.spreadsheetId.size() <= 128 &&
+             data.title is string && data.title.size() <= 256 &&
+             data.createdAt is string && data.createdAt.size() <= 64 &&
+             (!('activeTabName' in data) || (data.activeTabName is string && data.activeTabName.size() <= 128)) &&
+             (!('detectedArchetype' in data) || (data.detectedArchetype is string && data.detectedArchetype.size() <= 64)) &&
+             (!('isFavorite' in data) || (data.isFavorite is bool)) &&
+             (!('lastAccessedAt' in data) || (data.lastAccessedAt is string && data.lastAccessedAt.size() <= 64));
+    }
+
+    // User Documents & Preferences
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUserProfile(request.resource.data);
+      allow update: if isOwner(userId) && isValidId(userId) && isValidUserProfile(request.resource.data) &&
+                      request.resource.data.id == resource.data.id &&
+                      request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if false;
+
+      // User's Saved Spreadsheets & Dashboard History
+      match /saved_spreadsheets/{sheetId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(sheetId) && isValidSavedSpreadsheet(request.resource.data, userId);
+        allow update: if isOwner(userId) && isValidId(sheetId) && isValidSavedSpreadsheet(request.resource.data, userId) &&
+                        request.resource.data.id == resource.data.id &&
+                        request.resource.data.userId == resource.data.userId &&
+                        request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(userId) && isValidId(sheetId);
+      }
+    }
+  }
+}

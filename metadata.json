@@ -1,0 +1,8 @@
+{
+  "name": "Remix Daily Health \u0026 Vitality Hub",
+  "description": "A real-time dashboard visualizing daily health summaries, vitality metrics, and key performance indicators connected with Google Sheets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

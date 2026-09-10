@@ -1,0 +1,115 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile and personal preferences for dashboard persistence",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The unique Firebase Auth UID of the user",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "description": "The Google account email of the user",
+          "format": "email",
+          "maxLength": 256
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name",
+          "maxLength": 128
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Avatar image URL",
+          "maxLength": 512
+        },
+        "lastSpreadsheetId": {
+          "type": "string",
+          "description": "ID of the most recently accessed Google Spreadsheet",
+          "maxLength": 128
+        },
+        "lastSpreadsheetTitle": {
+          "type": "string",
+          "description": "Title of the most recently accessed Google Spreadsheet",
+          "maxLength": 256
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of user creation",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "email", "createdAt", "updatedAt"]
+    },
+    "SavedSpreadsheet": {
+      "title": "SavedSpreadsheet",
+      "description": "A saved or bookmarked Google Spreadsheet configuration for quick access",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Document ID matching spreadsheet ID or UUID",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "The UID of the owner",
+          "maxLength": 128
+        },
+        "spreadsheetId": {
+          "type": "string",
+          "description": "The Google Sheets spreadsheet ID",
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "description": "Spreadsheet title",
+          "maxLength": 256
+        },
+        "activeTabName": {
+          "type": "string",
+          "description": "Last active worksheet tab name",
+          "maxLength": 128
+        },
+        "detectedArchetype": {
+          "type": "string",
+          "description": "Detected archetype category (e.g. HEALTH_VITALITY, GENERIC_DATA)",
+          "maxLength": 64
+        },
+        "isFavorite": {
+          "type": "boolean",
+          "description": "Whether the user pinned or starred this dashboard"
+        },
+        "lastAccessedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last access",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of creation",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "userId", "spreadsheetId", "title", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores user profiles and dashboard configuration preferences"
+    },
+    "/users/{userId}/saved_spreadsheets/{sheetId}": {
+      "schema": "SavedSpreadsheet",
+      "description": "Stores saved spreadsheets and dashboards belonging to a user"
+    }
+  }
+}
