@@ -8,7 +8,8 @@ import {
   Clock,
   CheckCircle2,
   Radio,
-  LogIn
+  LogIn,
+  LogOut
 } from 'lucide-react';
 import { SheetMetadata, ReportViewMode } from '../types';
 import { GoogleSignInButton } from './GoogleSignInButton';
@@ -25,6 +26,9 @@ interface HeaderProps {
   isSyncing: boolean;
   currentUser: User | null;
   onGoogleSignIn: () => void;
+  onLogout?: () => void;
+  isSigningIn?: boolean;
+  isAuthInitializing?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -37,7 +41,10 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveTab,
   isSyncing,
   currentUser,
-  onGoogleSignIn
+  onGoogleSignIn,
+  onLogout,
+  isSigningIn = false,
+  isAuthInitializing = false
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 text-white">
@@ -193,25 +200,46 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
 
               {currentUser ? (
-                <div 
-                  onClick={onOpenSheetModal} 
-                  className="hidden xl:flex items-center gap-2 pl-2 pr-3 py-1 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700"
-                  title={`Signed in as ${currentUser.displayName || currentUser.email}`}
-                >
-                  <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300 text-[10px] font-bold">
-                    {currentUser.photoURL ? (
-                      <img src={currentUser.photoURL} alt="" className="w-full h-full rounded-full object-cover" />
-                    ) : (
-                      currentUser.displayName?.[0] || 'U'
-                    )}
+                <div className="flex items-center gap-2">
+                  <div 
+                    onClick={onOpenSheetModal} 
+                    className="flex items-center gap-2 pl-2 pr-3 py-1 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700 transition-colors"
+                    title={`Signed in as ${currentUser.displayName || currentUser.email}`}
+                  >
+                    <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300 text-[10px] font-bold overflow-hidden">
+                      {currentUser.photoURL ? (
+                        <img src={currentUser.photoURL} alt="" className="w-full h-full rounded-full object-cover" />
+                      ) : (
+                        currentUser.displayName?.[0] || 'U'
+                      )}
+                    </div>
+                    <span className="text-xs text-slate-300 max-w-[100px] truncate font-medium">
+                      {currentUser.displayName?.split(' ')[0] || 'Google User'}
+                    </span>
                   </div>
-                  <span className="text-xs text-slate-300 max-w-[90px] truncate font-medium">
-                    {currentUser.displayName?.split(' ')[0] || 'Google User'}
-                  </span>
+                  {onLogout && (
+                    <button
+                      type="button"
+                      onClick={onLogout}
+                      className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors"
+                      title="Sign Out"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ) : isAuthInitializing ? (
+                <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 text-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                  <span>Restoring session...</span>
                 </div>
               ) : (
-                <div className="hidden lg:block">
-                  <GoogleSignInButton onClick={onGoogleSignIn} text="Sign in" />
+                <div className="hidden sm:block">
+                  <GoogleSignInButton
+                    onClick={onGoogleSignIn}
+                    isLoading={isSigningIn}
+                    text="Continue with Google"
+                  />
                 </div>
               )}
             </div>

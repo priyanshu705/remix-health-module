@@ -24,6 +24,7 @@ import {
   GoogleSheetMetadataResponse 
 } from '../lib/googleSheetsService';
 import { googleSignIn, getAccessToken, logout } from '../lib/googleAuth';
+import { GoogleSignInButton } from './GoogleSignInButton';
 import { User } from 'firebase/auth';
 
 interface SheetConnectModalProps {
@@ -396,15 +397,11 @@ export const SheetConnectModal: React.FC<SheetConnectModalProps> = ({
                   Disconnect Account
                 </button>
               ) : (
-                <button
-                  type="button"
+                <GoogleSignInButton
                   onClick={handleSignIn}
-                  disabled={isSigningIn}
-                  className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {isSigningIn ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Lock className="w-3 h-3" />}
-                  <span>Connect with Google</span>
-                </button>
+                  isLoading={isSigningIn}
+                  text="Continue with Google"
+                />
               )}
             </div>
           </div>

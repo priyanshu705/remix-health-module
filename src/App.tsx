@@ -28,7 +28,10 @@ import {
   initAuth, 
   googleSignIn, 
   getAccessToken,
-  setAccessToken
+  setAccessToken,
+  logout,
+  AuthError,
+  isEmbeddedInIframe
 } from './lib/googleAuth';
 import { 
   testFirestoreConnection,
@@ -60,7 +63,10 @@ import {
   Plus,
   RefreshCw,
   ExternalLink,
-  X
+  X,
+  Copy,
+  Check,
+  Globe
 } from 'lucide-react';
 
 export default function App() {
@@ -82,9 +88,16 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isSheetModalOpen, setIsSheetModalOpen] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(true);
+  const [isSigningIn, setIsSigningIn] = useState<boolean>(false);
+  const [copiedDomain, setCopiedDomain] = useState<boolean>(false);
+
   const [authErrorBanner, setAuthErrorBanner] = useState<{
     message: string;
-    isPopupBlocked: boolean;
+    code?: string;
+    isPopupBlocked?: boolean;
+    isUnauthorizedDomain?: boolean;
+    domain?: string;
   } | null>(null);
 
   const [sheetMeta, setSheetMeta] = useState<SheetMetadata>({
@@ -256,7 +269,10 @@ export default function App() {
         }
       },
       () => {
-        // Not signed in
+        setCurrentUser(null);
+      },
+      () => {
+        setIsAuthInitializing(false);
       }
     );
     return () => unsubscribe();
@@ -384,6 +400,7 @@ export default function App() {
 
   const handleGoogleSignInClick = async () => {
     setAuthErrorBanner(null);
+    setIsSigningIn(true);
     try {
       const res = await googleSignIn();
       if (res && res.accessToken) {
@@ -393,12 +410,41 @@ export default function App() {
       }
     } catch (e: any) {
       console.error('Sign in error:', e);
-      const isBlocked = e?.code === 'auth/popup-blocked' || e?.isPopupBlocked || String(e?.message).toLowerCase().includes('popup');
+      const isBlocked = e?.code === 'auth/popup-blocked' || e?.isPopupBlocked;
+      const isUnauth = e?.code === 'auth/unauthorized-domain' || e?.isUnauthorizedDomain;
+      const domain = e?.domain || (typeof window !== 'undefined' ? window.location.hostname : '');
+      
       setAuthErrorBanner({
         message: e?.message || 'Failed to sign in with Google.',
-        isPopupBlocked: isBlocked
+        code: e?.code,
+        isPopupBlocked: isBlocked,
+        isUnauthorizedDomain: isUnauth,
+        domain
       });
+    } finally {
+      setIsSigningIn(false);
     }
+  };
+
+  const handleLogoutClick = async () => {
+    try {
+      await logout();
+      setCurrentUser(null);
+      setAccessToken(null);
+      setAuthErrorBanner(null);
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
+
+  const handleCopyDomain = (domainToCopy: string) => {
+    if (!domainToCopy) return;
+    navigator.clipboard.writeText(domainToCopy).then(() => {
+      setCopiedDomain(true);
+      setTimeout(() => setCopiedDomain(false), 3000);
+    }).catch(err => {
+      console.error('Failed to copy domain to clipboard:', err);
+    });
   };
 
   const handleRecordsLoaded = (
@@ -475,41 +521,91 @@ export default function App() {
         isSyncing={isSyncing}
         currentUser={currentUser}
         onGoogleSignIn={handleGoogleSignInClick}
+        onLogout={handleLogoutClick}
+        isSigningIn={isSigningIn}
+        isAuthInitializing={isAuthInitializing}
       />
 
       {/* Main Body Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 space-y-6">
         
-        {/* Auth / Popup Blocked Alert Banner */}
+        {/* Auth / Unauthorized Domain / Popup Alert Banner */}
         {authErrorBanner && (
-          <div className="rounded-2xl bg-gradient-to-r from-amber-950/70 via-slate-900 to-amber-950/70 border border-amber-500/40 p-4 sm:p-5 text-amber-200 text-xs shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="rounded-2xl bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border border-amber-500/40 p-4 sm:p-5 text-amber-200 text-xs shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 transition-all animate-fadeIn">
             <div className="flex items-start gap-3.5">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-400 mt-0.5">
-                <AlertCircle className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-400 mt-0.5">
+                {authErrorBanner.isUnauthorizedDomain ? (
+                  <Globe className="w-5 h-5 text-amber-300" />
+                ) : (
+                  <AlertCircle className="w-5 h-5" />
+                )}
               </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="font-bold text-amber-300 text-sm">
-                    {authErrorBanner.isPopupBlocked ? 'Sign-In Popup Blocked by Browser' : 'Google Authentication Notice'}
+                    {authErrorBanner.isUnauthorizedDomain
+                      ? 'Firebase Authorized Domain Setup Required'
+                      : authErrorBanner.isPopupBlocked
+                      ? 'Sign-In Popup Blocked by Browser'
+                      : 'Google Authentication Error'}
                   </span>
+                  {authErrorBanner.isUnauthorizedDomain && (
+                    <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[10px] font-mono uppercase tracking-wider font-semibold border border-amber-500/30">
+                      auth/unauthorized-domain
+                    </span>
+                  )}
                   {authErrorBanner.isPopupBlocked && (
                     <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 text-[10px] font-mono uppercase tracking-wider font-semibold border border-amber-400/30">
-                      Iframe / Sandbox Shield
+                      Iframe Shield
                     </span>
                   )}
                 </div>
-                <p className="text-slate-300 leading-relaxed max-w-2xl text-xs">
+
+                <p className="text-slate-300 leading-relaxed max-w-3xl text-xs">
                   {authErrorBanner.message}
                 </p>
+
+                {authErrorBanner.isUnauthorizedDomain && authErrorBanner.domain && (
+                  <div className="pt-1 flex flex-wrap items-center gap-2 text-[11px] text-amber-200/90 font-mono">
+                    <span className="text-slate-400 font-sans">Domain to add:</span>
+                    <span className="px-2 py-0.5 rounded bg-slate-950 border border-amber-500/30 text-amber-300 select-all font-semibold">
+                      {authErrorBanner.domain}
+                    </span>
+                  </div>
+                )}
+
                 {authErrorBanner.isPopupBlocked && (
                   <p className="text-[11px] text-amber-300/80 pt-0.5">
-                    💡 Tip: Opening this dashboard in a new browser tab bypasses iframe sandbox restrictions and allows Google Sign-In to connect without being blocked.
+                    💡 Tip: Opening this dashboard in a new tab bypasses iframe popup blocking.
                   </p>
                 )}
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5 shrink-0 self-end sm:self-center">
+            <div className="flex flex-wrap items-center gap-2 shrink-0 self-end lg:self-center">
+              {authErrorBanner.isUnauthorizedDomain && authErrorBanner.domain && (
+                <button
+                  type="button"
+                  onClick={() => handleCopyDomain(authErrorBanner.domain!)}
+                  className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-semibold text-xs border border-amber-500/40 transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  {copiedDomain ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedDomain ? 'Copied Domain!' : 'Copy Domain'}</span>
+                </button>
+              )}
+
+              {authErrorBanner.isUnauthorizedDomain && (
+                <a
+                  href={`https://console.firebase.google.com/u/0/project/integral-ascent-xdtd0/authentication/settings`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition-all shadow-md inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open Firebase Settings</span>
+                </a>
+              )}
+
               {authErrorBanner.isPopupBlocked && (
                 <a
                   href={typeof window !== 'undefined' ? window.location.href : '#'}
@@ -521,17 +617,20 @@ export default function App() {
                   <span>Open in New Tab</span>
                 </a>
               )}
+
               <button
                 type="button"
                 onClick={handleGoogleSignInClick}
-                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-colors border border-slate-700"
+                disabled={isSigningIn}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-semibold text-xs transition-colors border border-slate-700 cursor-pointer"
               >
-                Retry Sign-In
+                {isSigningIn ? 'Signing in...' : 'Retry Sign-In'}
               </button>
+
               <button
                 type="button"
                 onClick={() => setAuthErrorBanner(null)}
-                className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
                 title="Dismiss"
               >
                 <X className="w-4 h-4" />
