@@ -49,6 +49,7 @@ import {
 } from './lib/googleSheetsService';
 import { computeManagementOverview } from './lib/clientAnalytics';
 import { User } from 'firebase/auth';
+import { GoogleSignInButton } from './components/GoogleSignInButton';
 import { SpreadsheetTabsBar } from './components/SpreadsheetTabsBar';
 import { GenericTabDataTable } from './components/GenericTabDataTable';
 import { 
@@ -505,6 +506,193 @@ export default function App() {
       tabs: []
     }));
   };
+
+  if (isAuthInitializing) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100 font-sans selection:bg-emerald-500 selection:text-slate-950 antialiased p-4">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <Activity className="w-6 h-6 animate-pulse" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-sm font-bold text-slate-200">Initializing Session...</h2>
+            <p className="text-xs text-slate-500">Checking Firebase Google Authentication</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-slate-950 antialiased">
+        <Header
+          sheetMeta={sheetMeta}
+          isAutoSyncing={isAutoSyncing}
+          onToggleAutoSync={() => setIsAutoSyncing(prev => !prev)}
+          onManualRefresh={handleManualRefresh}
+          onOpenSheetModal={() => setIsSheetModalOpen(true)}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isSyncing={isSyncing}
+          currentUser={null}
+          onGoogleSignIn={handleGoogleSignInClick}
+          onLogout={handleLogoutClick}
+          isSigningIn={isSigningIn}
+          isAuthInitializing={isAuthInitializing}
+        />
+
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col items-center justify-center space-y-6">
+          {authErrorBanner && (
+            <div className="w-full max-w-2xl rounded-2xl bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border border-amber-500/40 p-4 sm:p-5 text-amber-200 text-xs shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 transition-all animate-fadeIn">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-400 mt-0.5">
+                  {authErrorBanner.isUnauthorizedDomain ? (
+                    <Globe className="w-5 h-5 text-amber-300" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5" />
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-bold text-amber-300 text-sm">
+                      {authErrorBanner.isUnauthorizedDomain
+                        ? 'Firebase Authorized Domain Setup Required'
+                        : authErrorBanner.isPopupBlocked
+                        ? 'Sign-In Popup Blocked by Browser'
+                        : 'Google Authentication Error'}
+                    </span>
+                    {authErrorBanner.isUnauthorizedDomain && (
+                      <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[10px] font-mono uppercase tracking-wider font-semibold border border-amber-500/30">
+                        auth/unauthorized-domain
+                      </span>
+                    )}
+                    {authErrorBanner.isPopupBlocked && (
+                      <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 text-[10px] font-mono uppercase tracking-wider font-semibold border border-amber-400/30">
+                        Iframe Shield
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-slate-300 leading-relaxed max-w-3xl text-xs">
+                    {authErrorBanner.message}
+                  </p>
+
+                  {authErrorBanner.isUnauthorizedDomain && authErrorBanner.domain && (
+                    <div className="pt-1 flex flex-wrap items-center gap-2 text-[11px] text-amber-200/90 font-mono">
+                      <span className="text-slate-400 font-sans">Domain to add:</span>
+                      <span className="px-2 py-0.5 rounded bg-slate-950 border border-amber-500/30 text-amber-300 select-all font-semibold">
+                        {authErrorBanner.domain}
+                      </span>
+                    </div>
+                  )}
+
+                  {authErrorBanner.isPopupBlocked && (
+                    <p className="text-[11px] text-amber-300/80 pt-0.5">
+                      💡 Tip: Opening this dashboard in a new tab bypasses iframe popup blocking.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0 self-end lg:self-center">
+                {authErrorBanner.isUnauthorizedDomain && authErrorBanner.domain && (
+                  <button
+                    type="button"
+                    onClick={() => handleCopyDomain(authErrorBanner.domain!)}
+                    className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-semibold text-xs border border-amber-500/40 transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {copiedDomain ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedDomain ? 'Copied Domain!' : 'Copy Domain'}</span>
+                  </button>
+                )}
+
+                {authErrorBanner.isUnauthorizedDomain && (
+                  <a
+                    href={`https://console.firebase.google.com/u/0/project/integral-ascent-xdtd0/authentication/settings`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition-all shadow-md inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Open Firebase Settings</span>
+                  </a>
+                )}
+
+                {authErrorBanner.isPopupBlocked && (
+                  <a
+                    href={typeof window !== 'undefined' ? window.location.href : '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition-all shadow-md inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Open in New Tab</span>
+                  </a>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleGoogleSignInClick}
+                  disabled={isSigningIn}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-semibold text-xs transition-colors border border-slate-700 cursor-pointer"
+                >
+                  {isSigningIn ? 'Signing in...' : 'Retry Sign-In'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAuthErrorBanner(null)}
+                  className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  title="Dismiss"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 sm:p-10 text-center space-y-6 shadow-2xl relative overflow-hidden my-auto">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500" />
+            
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400 shadow-inner">
+              <Activity className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <h1 className="text-xl font-black text-white tracking-tight">
+                Sign In to Access Dashboard
+              </h1>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Connect directly with your Google account to view real-time Google Spreadsheets, health records, and management analytics.
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-col items-center gap-3">
+              <GoogleSignInButton
+                onClick={handleGoogleSignInClick}
+                isLoading={isSigningIn}
+                text="Continue with Google"
+                className="w-full py-3 text-sm rounded-2xl"
+              />
+              
+              <p className="text-[11px] text-slate-500 flex items-center gap-1.5 pt-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Secure Google OAuth 2.0 & Firebase Auth</span>
+              </p>
+            </div>
+          </div>
+        </main>
+
+        <footer className="border-t border-slate-800/80 bg-slate-950 py-6 text-xs text-slate-400 mt-auto">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+            <span className="font-semibold text-slate-500">Universal Google Sheets Dashboard</span>
+            <span className="text-emerald-400 flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5" /> Read-Only Authorization</span>
+          </div>
+        </footer>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-slate-950 antialiased">
