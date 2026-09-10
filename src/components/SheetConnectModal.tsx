@@ -67,7 +67,7 @@ export const SheetConnectModal: React.FC<SheetConnectModalProps> = ({
   const [csvRawText, setCsvRawText] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' | 'info'; isPopupBlocked?: boolean } | null>(null);
 
   // When modal opens and user is logged in, auto-load recent spreadsheets from Drive
   useEffect(() => {
@@ -90,7 +90,12 @@ export const SheetConnectModal: React.FC<SheetConnectModalProps> = ({
       }
     } catch (err: any) {
       console.error('Sign in error:', err);
-      setStatusMsg({ text: err.message || 'Failed to sign in with Google.', type: 'error' });
+      const isBlocked = err?.code === 'auth/popup-blocked' || err?.isPopupBlocked || String(err?.message).toLowerCase().includes('popup');
+      setStatusMsg({ 
+        text: err.message || 'Failed to sign in with Google.', 
+        type: 'error',
+        isPopupBlocked: isBlocked
+      });
     } finally {
       setIsSigningIn(false);
     }
@@ -702,15 +707,28 @@ export const SheetConnectModal: React.FC<SheetConnectModalProps> = ({
 
           {/* Status Alert Banner */}
           {statusMsg && (
-            <div className={`p-3 rounded-xl border flex items-center gap-2 text-xs ${
+            <div className={`p-3 rounded-xl border flex flex-wrap items-center justify-between gap-2 text-xs ${
               statusMsg.type === 'success' 
                 ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300' 
                 : statusMsg.type === 'error'
                 ? 'bg-rose-950/60 border-rose-800 text-rose-300'
                 : 'bg-teal-950/60 border-teal-800 text-teal-300'
             }`}>
-              {statusMsg.type === 'success' ? <Check className="w-4 h-4 text-emerald-400 shrink-0" /> : <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />}
-              <span className="flex-1">{statusMsg.text}</span>
+              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                {statusMsg.type === 'success' ? <Check className="w-4 h-4 text-emerald-400 shrink-0" /> : <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />}
+                <span className="flex-1">{statusMsg.text}</span>
+              </div>
+              {statusMsg.isPopupBlocked && (
+                <a
+                  href={typeof window !== 'undefined' ? window.location.href : '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 rounded-lg bg-rose-500 hover:bg-rose-400 text-white font-bold text-[11px] transition-colors inline-flex items-center gap-1 shadow-sm shrink-0"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Open in New Tab</span>
+                </a>
+              )}
             </div>
           )}
 

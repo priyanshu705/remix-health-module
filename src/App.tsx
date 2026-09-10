@@ -59,7 +59,8 @@ import {
   AlertCircle,
   Plus,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  X
 } from 'lucide-react';
 
 export default function App() {
@@ -81,6 +82,10 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isSheetModalOpen, setIsSheetModalOpen] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authErrorBanner, setAuthErrorBanner] = useState<{
+    message: string;
+    isPopupBlocked: boolean;
+  } | null>(null);
 
   const [sheetMeta, setSheetMeta] = useState<SheetMetadata>({
     sheetId: '',
@@ -378,15 +383,21 @@ export default function App() {
   };
 
   const handleGoogleSignInClick = async () => {
+    setAuthErrorBanner(null);
     try {
       const res = await googleSignIn();
       if (res && res.accessToken) {
         setCurrentUser(res.user);
         setAccessToken(res.accessToken);
-        await attemptAutoLoadSpreadsheet(res.accessToken);
+        await attemptAutoLoadSpreadsheet(res.accessToken, res.user);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Sign in error:', e);
+      const isBlocked = e?.code === 'auth/popup-blocked' || e?.isPopupBlocked || String(e?.message).toLowerCase().includes('popup');
+      setAuthErrorBanner({
+        message: e?.message || 'Failed to sign in with Google.',
+        isPopupBlocked: isBlocked
+      });
     }
   };
 
@@ -469,6 +480,66 @@ export default function App() {
       {/* Main Body Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 space-y-6">
         
+        {/* Auth / Popup Blocked Alert Banner */}
+        {authErrorBanner && (
+          <div className="rounded-2xl bg-gradient-to-r from-amber-950/70 via-slate-900 to-amber-950/70 border border-amber-500/40 p-4 sm:p-5 text-amber-200 text-xs shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-400 mt-0.5">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-amber-300 text-sm">
+                    {authErrorBanner.isPopupBlocked ? 'Sign-In Popup Blocked by Browser' : 'Google Authentication Notice'}
+                  </span>
+                  {authErrorBanner.isPopupBlocked && (
+                    <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 text-[10px] font-mono uppercase tracking-wider font-semibold border border-amber-400/30">
+                      Iframe / Sandbox Shield
+                    </span>
+                  )}
+                </div>
+                <p className="text-slate-300 leading-relaxed max-w-2xl text-xs">
+                  {authErrorBanner.message}
+                </p>
+                {authErrorBanner.isPopupBlocked && (
+                  <p className="text-[11px] text-amber-300/80 pt-0.5">
+                    💡 Tip: Opening this dashboard in a new browser tab bypasses iframe sandbox restrictions and allows Google Sign-In to connect without being blocked.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0 self-end sm:self-center">
+              {authErrorBanner.isPopupBlocked && (
+                <a
+                  href={typeof window !== 'undefined' ? window.location.href : '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition-all shadow-md inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open in New Tab</span>
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={handleGoogleSignInClick}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-colors border border-slate-700"
+              >
+                Retry Sign-In
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthErrorBanner(null)}
+                className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                title="Dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Spreadsheet Tabs Navigation (Requirement 2, 11, 12, 13, 14) */}
         {tabs.length > 0 && (
           <SpreadsheetTabsBar
